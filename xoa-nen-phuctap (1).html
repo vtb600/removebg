@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Xoá nền ảnh phức tạp - AI / Remove.bg</title>
+<style>
+  :root{
+    --bg:#0f1117; --panel:#171a23; --panel2:#1f2330; --border:#2b3040;
+    --accent:#4f8cff; --accent2:#6ee7c9; --text:#e8eaf0; --muted:#9aa1b4; --danger:#ff6b6b;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:'Segoe UI', Roboto, Arial, sans-serif;
+    background:linear-gradient(160deg,#0f1117,#161a24);
+    color:var(--text); min-height:100vh; padding:24px;
+  }
+  h1{font-size:22px; margin:0 0 4px; font-weight:600;}
+  p.sub{color:var(--muted); margin:0 0 20px; font-size:14px;}
+  .wrap{max-width:1200px; margin:0 auto;}
+
+  .tabs{display:flex; gap:8px; margin-bottom:18px;}
+  .tab{
+    flex:1; text-align:center; padding:12px; border-radius:10px; cursor:pointer;
+    background:var(--panel); border:1px solid var(--border); color:var(--muted); font-size:14px;
+  }
+  .tab.active{background:var(--panel2); border-color:var(--accent); color:var(--text); font-weight:600;}
+  .tab small{display:block; font-weight:400; margin-top:3px; color:var(--muted); font-size:11px;}
+
+  .layout{display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;}
+  .panel{
+    background:var(--panel); border:1px solid var(--border); border-radius:14px;
+    padding:18px; flex:1 1 280px; min-width:260px;
+  }
+  .canvas-panel{
+    flex:2 1 560px; min-width:320px;
+    background:
+      linear-gradient(45deg,#2a2e3a 25%,transparent 25%),
+      linear-gradient(-45deg,#2a2e3a 25%,transparent 25%),
+      linear-gradient(45deg,transparent 75%,#2a2e3a 75%),
+      linear-gradient(-45deg,transparent 75%,#2a2e3a 75%);
+    background-size:20px 20px;
+    background-position:0 0,0 10px,10px -10px,-10px 0px;
+    background-color:#1c1f29;
+    border:1px solid var(--border); border-radius:14px;
+    padding:14px; display:flex; align-items:center; justify-content:center;
+    min-height:420px; position:relative; overflow:auto;
+  }
+  canvas{max-width:100%; border-radius:6px;}
+  .drop{
+    border:2px dashed var(--border); border-radius:10px; padding:26px 14px;
+    text-align:center; color:var(--muted); cursor:pointer; font-size:14px; width:100%;
+  }
+  .drop:hover{border-color:var(--accent); color:var(--text);}
+  input[type=file]{display:none;}
+  input[type=text], input[type=password]{
+    width:100%; background:var(--panel2); border:1px solid var(--border); color:var(--text);
+    padding:9px 10px; border-radius:8px; font-size:13px;
+  }
+  label.field{display:block; font-size:13px; color:var(--muted); margin:14px 0 6px;}
+  .btns{display:flex; flex-wrap:wrap; gap:8px; margin-top:14px;}
+  button{
+    background:var(--panel2); color:var(--text); border:1px solid var(--border);
+    padding:10px 14px; border-radius:8px; font-size:13px; cursor:pointer; transition:.15s;
+  }
+  button:hover{border-color:var(--accent); color:var(--accent);}
+  button.primary{background:var(--accent); border-color:var(--accent); color:#0b0d12; font-weight:600;}
+  button.primary:hover{filter:brightness(1.08); color:#0b0d12;}
+  button:disabled{opacity:.4; cursor:not-allowed;}
+  .hint{font-size:12px; color:var(--muted); line-height:1.6; margin-top:10px;}
+  .hint a{color:var(--accent2);}
+  .status{font-size:13px; margin-top:12px; min-height:18px;}
+  .status.ok{color:var(--accent2);}
+  .status.err{color:var(--danger);}
+  .status.busy{color:var(--accent);}
+  .pane{display:none;}
+  .pane.active{display:block;}
+  footer{text-align:center; color:var(--muted); font-size:12px; margin-top:24px;}
+  .spinner{
+    display:inline-block; width:14px; height:14px; border:2px solid var(--border);
+    border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite;
+    vertical-align:middle; margin-right:6px;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🧩 Xoá nền ảnh phức tạp</h1>
+  <p class="sub">Dành cho ảnh có nền lộn xộn / nhiều màu. Chọn 1 trong 2 phương pháp bên dưới.</p>
+
+  <div class="tabs">
+    <div class="tab active" id="tabAI">🤖 AI cục bộ (miễn phí)
+      <small>Chạy ngay trong trình duyệt, tốt nhất cho ảnh người/chân dung</small>
+    </div>
+    <div class="tab" id="tabAPI">☁️ Remove.bg API (trả phí)
+      <small>Chính xác cao cho mọi loại ảnh, cần API key riêng</small>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="canvas-panel" id="canvasPanel">
+      <div class="drop" id="dropZone">
+        📂 Kéo thả ảnh vào đây, hoặc bấm để chọn ảnh<br><small>(JPG, PNG, WEBP...)</small>
+      </div>
+      <canvas id="canvas" style="display:none;"></canvas>
+    </div>
+
+    <div class="panel">
+      <input type="file" id="fileInput" accept="image/*">
+
+      <!-- AI local pane -->
+      <div class="pane active" id="paneAI">
+        <div class="hint">
+          Dùng mô hình <b>MediaPipe Selfie Segmentation</b> của Google, chạy hoàn toàn trên máy bạn (không upload ảnh lên server nào). Phù hợp nhất cho ảnh <b>chân dung / có người</b>, kể cả nền lộn xộn nhiều màu.
+        </div>
+        <div class="btns">
+          <button id="runAI" class="primary" disabled>✨ Tách nền bằng AI</button>
+        </div>
+        <div class="status" id="statusAI"></div>
+      </div>
+
+      <!-- API pane -->
+      <div class="pane" id="paneAPI">
+        <label class="field">API Key remove.bg</label>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <input type="password" id="apiKey" placeholder="Dán API key của bạn..." style="flex:1;">
+          <button id="toggleKeyVisible" title="Hiện/ẩn key" style="padding:9px 10px;">👁️</button>
+        </div>
+        <div id="keySavedStatus" style="font-size:12px; margin-top:6px; min-height:16px;"></div>
+        <div class="btns" style="margin-top:8px;">
+          <button id="saveKeyBtn">💾 Lưu key</button>
+          <button id="clearKeyBtn">🗑️ Xoá key đã lưu</button>
+        </div>
+        <div class="hint">
+          Lấy API key miễn phí (50 ảnh/tháng) tại
+          <a href="https://www.remove.bg/api" target="_blank" rel="noopener">remove.bg/api</a>.
+          Key tự động được ghi nhớ trên trình duyệt này (localStorage) ngay sau khi bạn dán/nhập — lần sau mở lại trang không cần nhập lại. Key chỉ gửi tới remove.bg, không gửi cho ai khác.
+        </div>
+        <div class="btns">
+          <button id="runAPI" class="primary" disabled>☁️ Tách nền qua Remove.bg</button>
+        </div>
+        <div class="status" id="statusAPI"></div>
+      </div>
+
+      <div class="btns">
+        <button id="resetBtn" disabled>🔄 Ảnh gốc</button>
+        <button id="downloadBtn" disabled style="flex:1;">⬇️ Tải PNG (nền trong suốt)</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>AI cục bộ dùng mô hình mã nguồn mở của Google (MediaPipe). Remove.bg là dịch vụ bên thứ ba, có phí ngoài gói miễn phí.</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
+<script>
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+const tabAI = document.getElementById('tabAI');
+const tabAPI = document.getElementById('tabAPI');
+const paneAI = document.getElementById('paneAI');
+const paneAPI = document.getElementById('paneAPI');
+
+const runAI = document.getElementById('runAI');
+const runAPI = document.getElementById('runAPI');
+const resetBtn = document.getElementById('resetBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const statusAI = document.getElementById('statusAI');
+const statusAPI = document.getElementById('statusAPI');
+const apiKeyInput = document.getElementById('apiKey');
+
+let currentImage = null; // HTMLImageElement, original
+let originalImageData = null;
+
+const keySavedStatus = document.getElementById('keySavedStatus');
+const saveKeyBtn = document.getElementById('saveKeyBtn');
+const clearKeyBtn = document.getElementById('clearKeyBtn');
+const toggleKeyVisible = document.getElementById('toggleKeyVisible');
+const STORAGE_KEY = 'removebg_api_key';
+
+const savedKey = localStorage.getItem(STORAGE_KEY) || '';
+apiKeyInput.value = savedKey;
+if(savedKey) showKeyStatus('✅ Đã ghi nhớ key từ lần trước.', 'ok');
+
+let saveTimeout = null;
+apiKeyInput.addEventListener('input', () => {
+  // Auto-save shortly after typing/pasting stops
+  clearTimeout(saveTimeout);
+  const val = apiKeyInput.value.trim();
+  if(!val){
+    showKeyStatus('', '');
+    return;
+  }
+  showKeyStatus('Đang lưu...', 'busy');
+  saveTimeout = setTimeout(() => {
+    localStorage.setItem(STORAGE_KEY, val);
+    showKeyStatus('✅ Đã tự động lưu key vào trình duyệt này.', 'ok');
+  }, 400);
+});
+apiKeyInput.addEventListener('paste', () => {
+  setTimeout(() => {
+    const val = apiKeyInput.value.trim();
+    if(val){
+      localStorage.setItem(STORAGE_KEY, val);
+      showKeyStatus('✅ Đã lưu key vừa dán.', 'ok');
+    }
+  }, 50);
+});
+
+saveKeyBtn.addEventListener('click', () => {
+  const val = apiKeyInput.value.trim();
+  if(!val){
+    showKeyStatus('⚠️ Chưa nhập key nào để lưu.', 'err');
+    return;
+  }
+  localStorage.setItem(STORAGE_KEY, val);
+  showKeyStatus('✅ Đã lưu key.', 'ok');
+});
+
+clearKeyBtn.addEventListener('click', () => {
+  localStorage.removeItem(STORAGE_KEY);
+  apiKeyInput.value = '';
+  showKeyStatus('🗑️ Đã xoá key khỏi trình duyệt.', 'err');
+});
+
+toggleKeyVisible.addEventListener('click', () => {
+  apiKeyInput.type = apiKeyInput.type === 'password' ? 'text' : 'password';
+});
+
+function showKeyStatus(text, kind){
+  keySavedStatus.textContent = text;
+  keySavedStatus.style.color = kind === 'ok' ? 'var(--accent2)' : kind === 'err' ? 'var(--danger)' : 'var(--muted)';
+}
+
+tabAI.onclick = () => switchTab('ai');
+tabAPI.onclick = () => switchTab('api');
+function switchTab(which){
+  tabAI.classList.toggle('active', which === 'ai');
+  tabAPI.classList.toggle('active', which === 'api');
+  paneAI.classList.toggle('active', which === 'ai');
+  paneAPI.classList.toggle('active', which === 'api');
+}
+
+// ---- Load image ----
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = 'var(--accent)'; });
+dropZone.addEventListener('dragleave', () => dropZone.style.borderColor = 'var(--border)');
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.style.borderColor = 'var(--border)';
+  if(e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => { if(e.target.files.length) loadFile(e.target.files[0]); });
+
+let currentFile = null;
+
+function loadFile(file){
+  if(!file.type.startsWith('image/')) return alert('Vui lòng chọn 1 file ảnh.');
+  currentFile = file;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      const maxDim = 1600;
+      let w = img.width, h = img.height;
+      if(w > maxDim || h > maxDim){
+        const scale = Math.min(maxDim / w, maxDim / h);
+        w = Math.round(w * scale); h = Math.round(h * scale);
+      }
+      canvas.width = w; canvas.height = h;
+      ctx.clearRect(0,0,w,h);
+      ctx.drawImage(img, 0, 0, w, h);
+      originalImageData = ctx.getImageData(0,0,w,h);
+      currentImage = img;
+      dropZone.style.display = 'none';
+      canvas.style.display = 'block';
+      runAI.disabled = false;
+      runAPI.disabled = false;
+      resetBtn.disabled = false;
+      downloadBtn.disabled = false;
+      statusAI.textContent = '';
+      statusAPI.textContent = '';
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+resetBtn.addEventListener('click', () => {
+  if(!originalImageData) return;
+  canvas.width = originalImageData.width;
+  canvas.height = originalImageData.height;
+  ctx.putImageData(originalImageData, 0, 0);
+  statusAI.textContent = '';
+  statusAPI.textContent = '';
+});
+
+downloadBtn.addEventListener('click', () => {
+  const link = document.createElement('a');
+  link.download = 'anh-tach-nen.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
+
+// ---- AI local (MediaPipe Selfie Segmentation) ----
+let segmenter = null;
+function getSegmenter(){
+  if(segmenter) return segmenter;
+  segmenter = new SelfieSegmentation({
+    locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${f}`
+  });
+  segmenter.setOptions({ modelSelection: 1 }); // 1 = landscape model, better for general photos
+  return segmenter;
+}
+
+runAI.addEventListener('click', async () => {
+  if(!currentImage) return;
+  runAI.disabled = true;
+  statusAI.innerHTML = '<span class="spinner"></span>Đang tải mô hình AI & xử lý... (lần đầu có thể mất vài giây)';
+  statusAI.className = 'status busy';
+  try{
+    const seg = getSegmenter();
+    const w = canvas.width, h = canvas.height;
+
+    const result = await new Promise((resolve, reject) => {
+      seg.onResults((results) => resolve(results));
+      seg.send({ image: currentImage }).catch(reject);
+    });
+
+    // Draw original image at working resolution
+    const work = document.createElement('canvas');
+    work.width = w; work.height = h;
+    const wctx = work.getContext('2d');
+    wctx.drawImage(currentImage, 0, 0, w, h);
+    const baseData = wctx.getImageData(0,0,w,h);
+
+    // Draw mask scaled to working resolution
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = w; maskCanvas.height = h;
+    const mctx = maskCanvas.getContext('2d');
+    mctx.drawImage(result.segmentationMask, 0, 0, w, h);
+    const maskData = mctx.getImageData(0,0,w,h);
+
+    // Apply mask as alpha (mask is grayscale: bright = foreground)
+    for(let i = 0; i < w*h; i++){
+      const alpha = maskData.data[i*4]; // R channel of mask ~ foreground probability
+      baseData.data[i*4+3] = alpha;
+    }
+
+    canvas.width = w; canvas.height = h;
+    ctx.putImageData(baseData, 0, 0);
+
+    statusAI.textContent = '✅ Đã tách nền xong. Kiểm tra viền, nếu chưa ưng có thể tải lại và thử ảnh rõ chủ thể hơn.';
+    statusAI.className = 'status ok';
+  }catch(err){
+    console.error(err);
+    statusAI.textContent = '❌ Lỗi khi chạy AI: ' + (err.message || err) + '. Kiểm tra kết nối mạng (cần tải mô hình từ CDN lần đầu).';
+    statusAI.className = 'status err';
+  }finally{
+    runAI.disabled = false;
+  }
+});
+
+// ---- Remove.bg API ----
+runAPI.addEventListener('click', async () => {
+  const key = apiKeyInput.value.trim();
+  if(!key){
+    statusAPI.textContent = '⚠️ Vui lòng nhập API key remove.bg trước.';
+    statusAPI.className = 'status err';
+    return;
+  }
+  if(!currentFile){
+    statusAPI.textContent = '⚠️ Chưa có ảnh.';
+    statusAPI.className = 'status err';
+    return;
+  }
+  runAPI.disabled = true;
+  statusAPI.innerHTML = '<span class="spinner"></span>Đang gửi ảnh tới remove.bg...';
+  statusAPI.className = 'status busy';
+  try{
+    const formData = new FormData();
+    formData.append('image_file', currentFile);
+    formData.append('size', 'auto');
+
+    const response = await fetch('https://api.remove.bg/v1.0/removebg', {
+      method: 'POST',
+      headers: { 'X-Api-Key': key },
+      body: formData
+    });
+
+    if(!response.ok){
+      let msg = 'Lỗi API (' + response.status + ')';
+      try{
+        const errJson = await response.json();
+        if(errJson.errors && errJson.errors[0]) msg = errJson.errors[0].title || msg;
+      }catch(e){}
+      throw new Error(msg);
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      statusAPI.textContent = '✅ Tách nền thành công qua remove.bg.';
+      statusAPI.className = 'status ok';
+    };
+    img.src = url;
+  }catch(err){
+    console.error(err);
+    statusAPI.textContent = '❌ ' + (err.message || 'Lỗi không xác định') + '. Kiểm tra lại API key hoặc hạn mức tài khoản.';
+    statusAPI.className = 'status err';
+  }finally{
+    runAPI.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
