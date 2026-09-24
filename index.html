@@ -181,10 +181,15 @@ const saveKeyBtn = document.getElementById('saveKeyBtn');
 const clearKeyBtn = document.getElementById('clearKeyBtn');
 const toggleKeyVisible = document.getElementById('toggleKeyVisible');
 const STORAGE_KEY = 'removebg_api_key';
+const DEFAULT_API_KEY = 'i89xMjEMpigrvmhZN2MSCuDC';
 
 const savedKey = localStorage.getItem(STORAGE_KEY) || '';
-apiKeyInput.value = savedKey;
-if(savedKey) showKeyStatus('✅ Đã ghi nhớ key từ lần trước.', 'ok');
+apiKeyInput.value = savedKey || DEFAULT_API_KEY;
+if(savedKey){
+  showKeyStatus('✅ Đã ghi nhớ key từ lần trước.', 'ok');
+}else{
+  showKeyStatus('🔑 Đang dùng API key có sẵn trong trang.', 'ok');
+}
 
 let saveTimeout = null;
 apiKeyInput.addEventListener('input', () => {
@@ -367,7 +372,7 @@ runAI.addEventListener('click', async () => {
 
 // ---- Remove.bg API ----
 runAPI.addEventListener('click', async () => {
-  const key = apiKeyInput.value.trim();
+  const key = apiKeyInput.value.trim() || DEFAULT_API_KEY;
   if(!key){
     statusAPI.textContent = '⚠️ Vui lòng nhập API key remove.bg trước.';
     statusAPI.className = 'status err';
